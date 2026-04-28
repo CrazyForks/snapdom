@@ -867,6 +867,28 @@
       margin-left: 0.5rem;
     }
 
+    .benchmark-cta {
+      display: inline-block;
+      margin: 0.9rem 0 0;
+      padding: 0.55rem 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--sd-accent);
+      background: transparent;
+      border: 2px solid var(--sd-accent);
+      border-radius: 8px;
+      text-decoration: none;
+      transition: transform 0.15s, background 0.15s, color 0.15s;
+    }
+    .benchmark-cta:hover {
+      background: var(--sd-accent);
+      color: #FFFCF4;
+      transform: translate(-1px, -1px);
+    }
+    .benchmark-cta span { margin-left: 0.3rem; transition: margin-left 0.15s; }
+    .benchmark-cta:hover span { margin-left: 0.55rem; }
+
     .benchmark-container {
       display: flex;
       flex-wrap: wrap;
@@ -2031,7 +2053,11 @@
         : (snapAvg < h2cAvg
           ? 'snapDOM wins! (' + (h2cAvg / snapAvg).toFixed(1) + 'x faster)'
           : 'html2canvas wins! (' + (snapAvg / h2cAvg).toFixed(1) + 'x faster)');
-      resultText.innerHTML = '<div class="winner-message">' + winnerMessage + '</div>';
+      resultText.innerHTML =
+        '<div class="winner-message">' + winnerMessage + '</div>' +
+        '<a class="benchmark-cta" href="./compare/html2canvas/" data-umami-event="Benchmark CTA compare">' +
+          'Why you should stop using html2canvas now <span aria-hidden="true">→</span>' +
+        '</a>';
 
       snapContainer.classList.toggle('winner-glow', !h2c || snapAvg < h2cAvg);
       h2cContainer.classList.toggle('winner-glow', h2c && h2cAvg < snapAvg);
