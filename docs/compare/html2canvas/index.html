@@ -115,6 +115,9 @@
     .bench-output img, .bench-output canvas { max-width: 100%; max-height: 190px; object-fit: contain; margin: 0 auto; display: block; }
     .bench-output .progress-message { font-size: 13px; color: var(--text-muted); font-family: var(--font-mono); font-weight: 700; }
     .bench-output .result-message { margin-top: 8px; font-size: 12px; font-family: var(--font-mono); font-weight: 700; color: var(--text); background: rgba(0,0,0,0.05); padding: 4px 8px; border-radius: 4px; }
+    .h2c-crash { width: 100%; padding: 12px; text-align: left; }
+    .h2c-crash-tag { display: inline-block; font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 1.5px; padding: 3px 8px; border-radius: 4px; background: var(--rose, #E63946); color: #FFFCF4; font-weight: 700; margin-bottom: 8px; }
+    .h2c-crash-msg { font-family: var(--font-mono); font-size: 11px; line-height: 1.5; color: var(--rose, #E63946); background: var(--rose-soft, rgba(230,57,70,0.12)); border: 1px solid var(--rose, #E63946); border-radius: 6px; padding: 8px 10px; word-break: break-word; }
     .winner-glow { animation: bench-glow 1.2s infinite alternate ease-in-out; border-radius: 12px; }
     @keyframes bench-glow {
       from { box-shadow: 3px 3px 0 var(--border), 0 0 8px 2px var(--border-soft, rgba(0,0,0,0.1)); }
@@ -123,6 +126,7 @@
     @media (max-width: 640px) {
       .bench-grid { grid-template-columns: 1fr; }
     }
+
   </style>
 
   <script defer src="https://cloud.umami.is/script.js" data-website-id="7ec718e8-f0c5-4abb-8f4f-144f57f61937"></script>
@@ -165,7 +169,12 @@
       <div class="bench-target" id="bench-target">Test element to be captured by both libraries.</div>
 
       <div class="bench-actions">
-        <button type="button" class="btn btn-primary run-benchmark-button" data-umami-event="Cmp h2c run benchmark">Run benchmark</button>
+        <button type="button" class="btn btn-primary run-benchmark-button"
+                data-target="bench-target"
+                data-snap="bench-snapdom"
+                data-h2c="bench-h2c"
+                data-result="bench-result"
+                data-umami-event="Cmp h2c run benchmark simple">Run benchmark</button>
       </div>
 
       <div class="bench-result" id="bench-result"></div>
@@ -181,6 +190,7 @@
         </div>
       </div>
     </section>
+
 
     <section class="prose">
       <h2 id="overview">A quick overview</h2>
@@ -363,14 +373,15 @@ document.body.<span class="fn">appendChild</span>(img);</pre>
       return html2canvas;
     }
 
-    const btn = document.querySelector('.run-benchmark-button');
-    if (btn) btn.addEventListener('click', runBenchmark);
+    document.querySelectorAll('.run-benchmark-button').forEach(b => {
+      b.addEventListener('click', () => runBenchmark(b));
+    });
 
-    async function runBenchmark() {
-      const el = document.getElementById('bench-target');
-      const snap = document.getElementById('bench-snapdom');
-      const h2c = document.getElementById('bench-h2c');
-      const out = document.getElementById('bench-result');
+    async function runBenchmark(btn) {
+      const el = document.getElementById(btn.dataset.target);
+      const snap = document.getElementById(btn.dataset.snap);
+      const h2c = document.getElementById(btn.dataset.h2c);
+      const out = document.getElementById(btn.dataset.result);
       if (!el || !snap || !h2c || !out || !btn) return;
 
       snap.innerHTML = '<div class="progress-message">Starting SnapDOM…</div>';
@@ -406,6 +417,7 @@ document.body.<span class="fn">appendChild</span>(img);</pre>
       }
 
       let h2cTotal = 0;
+      let h2cError = null;
       if (h2cFn) {
         h2c.innerHTML = '<div class="progress-message">html2canvas: starting…</div>';
         await tick();
@@ -413,26 +425,43 @@ document.body.<span class="fn">appendChild</span>(img);</pre>
           h2c.innerHTML = '<div class="progress-message">html2canvas: capture ' + (i + 1) + '/5…</div>';
           await tick();
           const t0 = performance.now();
-          const cv = await h2cFn(el, { logging: false });
-          h2cTotal += performance.now() - t0;
-          h2c.innerHTML = '';
-          h2c.appendChild(cv);
-          h2c.insertAdjacentHTML('beforeend', '<div class="progress-message">html2canvas: ' + (i + 1) + '/5</div>');
+          try {
+            const cv = await h2cFn(el, { logging: false });
+            h2cTotal += performance.now() - t0;
+            h2c.innerHTML = '';
+            h2c.appendChild(cv);
+            h2c.insertAdjacentHTML('beforeend', '<div class="progress-message">html2canvas: ' + (i + 1) + '/5</div>');
+          } catch (err) {
+            h2cError = err && err.message ? err.message : String(err);
+            h2c.innerHTML =
+              '<div class="h2c-crash">' +
+                '<div class="h2c-crash-tag">html2canvas crashed</div>' +
+                '<div class="h2c-crash-msg">' + escapeHtml(h2cError) + '</div>' +
+              '</div>';
+            break;
+          }
           await tick();
         }
       }
 
       const snapAvg = snapTotal / 5;
-      const h2cAvg = h2cTotal / 5;
       snap.insertAdjacentHTML('beforeend', '<div class="result-message">avg ' + snapAvg.toFixed(1) + ' ms</div>');
-      if (h2cFn) h2c.insertAdjacentHTML('beforeend', '<div class="result-message">avg ' + h2cAvg.toFixed(1) + ' ms</div>');
 
-      if (h2cFn && snapAvg < h2cAvg) {
-        out.textContent = 'SnapDOM wins — ' + (h2cAvg / snapAvg).toFixed(1) + '× faster';
+      if (h2cError) {
+        out.innerHTML =
+          'SnapDOM rendered this in <strong>' + snapAvg.toFixed(1) + ' ms</strong> · ' +
+          '<span style="color:var(--rose,#E63946)">html2canvas threw an exception</span>';
         snap.classList.add('winner-glow');
-      } else if (h2cFn && h2cAvg < snapAvg) {
-        out.textContent = 'html2canvas wins — ' + (snapAvg / h2cAvg).toFixed(1) + '× faster';
-        h2c.classList.add('winner-glow');
+      } else if (h2cFn) {
+        const h2cAvg = h2cTotal / 5;
+        h2c.insertAdjacentHTML('beforeend', '<div class="result-message">avg ' + h2cAvg.toFixed(1) + ' ms</div>');
+        if (snapAvg < h2cAvg) {
+          out.textContent = 'SnapDOM wins — ' + (h2cAvg / snapAvg).toFixed(1) + '× faster';
+          snap.classList.add('winner-glow');
+        } else {
+          out.textContent = 'html2canvas wins — ' + (snapAvg / h2cAvg).toFixed(1) + '× faster';
+          h2c.classList.add('winner-glow');
+        }
       } else {
         out.textContent = 'SnapDOM benchmark complete (html2canvas unavailable)';
         snap.classList.add('winner-glow');
@@ -440,6 +469,10 @@ document.body.<span class="fn">appendChild</span>(img);</pre>
 
       btn.disabled = false;
       btn.textContent = 'Run benchmark again';
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     }
   </script>
 </body>
