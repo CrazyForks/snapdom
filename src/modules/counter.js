@@ -254,7 +254,11 @@ export function buildCounterContext(root) {
 
 /**
  * Resolves counter()/counters() calls inside a content string for a specific node,
- * returning a plain string suitable for textContent. Also strips double-quote tokens.
+ * returning the content with counter() expanded but quoted-string tokens preserved.
+ * The caller is responsible for joining tokens (see pseudo.js collapseCssContent)
+ * or stripping quotes (see resolvePseudoContent below) — keeping quotes here lets
+ * collapseCssContent tokenize properly so source whitespace between adjacent
+ * tokens (e.g. `counter(x) ")"`) doesn't leak into the rendered text.
  *
  * @param {string} raw
  * @param {Element} node
@@ -264,7 +268,7 @@ export function resolveCountersInContent(raw, node, ctx) {
   if (!raw || raw === 'none') return raw
   try {
     const RX = /\b(counter|counters)\s*\(([^)]+)\)/g
-    let out = raw.replace(RX, (_, fn, args) => {
+    return raw.replace(RX, (_, fn, args) => {
       const parts = String(args).split(',').map(s => s.trim())
       if (fn === 'counter') {
         const name = parts[0]?.replace(/^["']|["']$/g, '')
@@ -281,7 +285,6 @@ export function resolveCountersInContent(raw, node, ctx) {
         return pieces.join(sep)
       }
     })
-    return unquoteDoubleStrings(out)
   } catch {
     return '- '
   }

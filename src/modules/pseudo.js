@@ -231,19 +231,25 @@ function unquoteDoubleStrings(s) {
 }
 
 /**
- * Concatena tokens de content (p.ej. `"1" "."`) sin introducir espacios.
- * Si no hay comillas, devuelve el unquote estándar.
+ * Concatena tokens de CSS `content` (cadenas y resultados de counter()/counters())
+ * sin el whitespace que los separa en el source — el browser concatena tokens
+ * adyacentes sin espacios, así que `counter(x) ")"` debe renderizar `1)` y no `1 )`.
  * @param {string} raw
  */
 function collapseCssContent(raw) {
   if (!raw) return ''
-  const tokens = []
+  const parts = []
   const rx = /"([^"]*)"/g
-  let m
-  while ((m = rx.exec(raw))) tokens.push(m[1])
-  // Si hay tokens con comillas, concatenar sin espacios (comportamiento del browser)
-  if (tokens.length) return tokens.join('')
-  return unquoteDoubleStrings(raw)
+  let lastIndex = 0, m
+  while ((m = rx.exec(raw))) {
+    const between = raw.slice(lastIndex, m.index).trim()
+    if (between) parts.push(between)
+    parts.push(m[1])
+    lastIndex = rx.lastIndex
+  }
+  const tail = raw.slice(lastIndex).trim()
+  if (tail) parts.push(tail)
+  return parts.join('')
 }
 
 /**

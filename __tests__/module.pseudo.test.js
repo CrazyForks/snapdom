@@ -339,4 +339,34 @@ describe('inlinePseudoElements', () => {
     expect(pseudoAfter).toBeTruthy()
     expect(pseudoAfter.style.backgroundImage.startsWith('url("data:image/')).toBeTruthy()
   })
+
+  // Regression: issue #235 — `content: counter(x) ")"` rendered as `1 )` (with space),
+  // causing the `)` to wrap onto a separate line under display:grid/flex parents.
+  it('joins counter() with adjacent string token without source whitespace', async () => {
+    const ol = document.createElement('ol')
+    ol.className = 'reg-235-ol'
+    const li = document.createElement('li')
+    li.className = 'reg-235-li'
+    li.textContent = 'item'
+    ol.appendChild(li)
+    document.body.appendChild(ol)
+
+    const style = document.createElement('style')
+    style.textContent = `
+      .reg-235-ol { counter-reset: item; list-style: none; }
+      .reg-235-li::before {
+        counter-increment: item;
+        content: counter(item) ")";
+      }
+    `
+    document.head.appendChild(style)
+
+    const cloneOl = ol.cloneNode(true)
+    const cloneLi = cloneOl.firstElementChild
+    await inlinePseudoElements(li, cloneLi, sessionCache, {})
+
+    const before = cloneLi.querySelector('[data-snapdom-pseudo="::before"]')
+    expect(before).toBeTruthy()
+    expect(before.textContent).toBe('1)')
+  })
 })
